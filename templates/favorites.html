@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Избранные самолёты</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <style>
+        #scrollable-table {
+            max-height: 400px;
+            overflow-y: scroll;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: left;
+        }
+
+        #map {
+            height: 400px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/">Главная</a> |
+        <a href="/logout">Выйти</a>
+    </nav>
+
+    <h1>Избранные самолёты</h1>
+
+    <div id="scrollable-table">
+        <table>
+            <thead>
+                <tr>
+                    <th>Номер рейса</th>
+                    <th>Страна происхождения</th>
+                    <th>Координаты</th>
+                    <th>Действие</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if data %}
+                {% for plane in data %}
+                <tr id="plane-{{ plane[1] }}">
+                    <td>{{ plane[1] or 'Неизвестно' }}</td>
+                    <td>{{ plane[2] or 'Неизвестно' }}</td>
+                    <td>{{ plane[6] or 'N/A' }}, {{ plane[5] or 'N/A' }}</td>
+                    <td><button onclick="removeFromFavorites('{{ plane[1] }}')">Удалить</button></td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="4">Избранных самолётов нет.</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <div id="map"></div>
+
+    <script>
+        var map = L.map('map').setView([20, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        var planes = {{ data|tojson }};
+        planes.forEach(function(plane) {
+            if (plane[5] && plane[6] && plane[1]) {
+                var marker = L.marker([plane[6], plane[5]]).addTo(map)
+                    .bindPopup('<b>Номер рейса: </b>' + plane[1] + '<br><b>Страна: </b>' + (plane[2] || 'Неизвестно'));
+            }
+        });
+
+        function removeFromFavorites(callsign) {
+            fetch('/remove_from_favorites', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ callsign: callsign }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.message) {
+                    alert(data.message);
+                    document.getElementById('plane-' + callsign).remove(); // Удаляем строку таблицы
+                }
+            });
+        }
+    </script>
+</body>
+</html>

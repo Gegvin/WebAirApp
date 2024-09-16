@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Самолёты</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <style>
+        #scrollable-table {
+            max-height: 400px;
+            overflow-y: scroll;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: left;
+        }
+
+        #map {
+            height: 400px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/">Главная</a> |
+        {% if current_user.is_authenticated and current_user.is_admin %}
+        <a href="{{ url_for('admin') }}">Админка</a>
+        {% endif %}
+        <a href="/favorites">Избранное</a> |
+        <a href="/logout">Выйти</a>
+    </nav>
+
+    <h1>Информация о самолётах</h1>
+
+    <!-- Форма для поиска по позывному -->
+    <form method="POST" action="/search_by_callsign">
+        <label for="callsign">Позывной:</label>
+        <input type="text" name="callsign" id="callsign" placeholder="Введите позывной" value="{{ callsign if callsign }}">
+        <button type="submit">Найти по позывному</button>
+    </form>
+
+    <!-- Форма для поиска по стране происхождения -->
+    <form method="POST" action="/search_by_country">
+        <label for="origin_country">Страна происхождения:</label>
+        <input type="text" name="origin_country" id="origin_country" placeholder="Введите страну" value="{{ origin_country if origin_country }}">
+        <button type="submit">Найти по стране происхождения</button>
+    </form>
+
+
+
+    <!-- Форма для поиска по координатам -->
+    <form method="POST" action="/search_by_coordinates">
+        <label for="latitude">Широта:</label>
+        <input type="number" step="0.0001" name="latitude" id="latitude" placeholder="Введите широту" value="{{ latitude if latitude }}">
+        <label for="longitude">Долгота:</label>
+        <input type="number" step="0.0001" name="longitude" id="longitude" placeholder="Введите долготу" value="{{ longitude if longitude }}">
+        <button type="submit">Найти по координатам</button>
+    </form>
+
+    <div id="scrollable-table">
+        <table>
+            <thead>
+                <tr>
+                    <th>Позывной</th>
+                    <th>Страна происхождения</th>
+                    <th>Координаты</th>
+                    <th>Избранное</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for plane in data %}
+                <tr>
+                    <td>{{ plane[1] }}</td>
+                    <td>{{ plane[2] }}</td>
+                    <td>{{ plane[6] }}, {{ plane[5] }}</td>
+                    <td><button onclick="addToFavorites('{{ plane[1] }}')">Добавить в избранное</button></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div id="pagination">
+        {% if page > 1 %}
+            <a href="{{ base_url }}&page={{ page - 1 }}">Предыдущая страница</a>
+        {% endif %}
+        <span>Страница {{ page }} из {{ total_pages }}</span>
+        {% if page < total_pages %}
+            <a href="{{ base_url }}&page={{ page + 1 }}">Следующая страница</a>
+        {% endif %}
+    </div>
+
+    <div id="map"></div>
+
+    <script>
+        var map = L.map('map').setView([20, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        var planes = {{ data|tojson }};
+        planes.forEach(function(plane) {
+            if (plane[5] && plane[6] && plane[1]) {
+                var marker = L.marker([plane[6], plane[5]]).addTo(map)
+                    .bindPopup('<b>Позывной: </b>' + plane[1] + '<br><b>Страна: </b>' + (plane[2] || 'Неизвестно'));
+            }
+        });
+
+        function addToFavorites(callsign) {
+            fetch('/add_to_favorites', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ callsign: callsign }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert(data.message);
+            });
+        }
+    </script>
+</body>
+</html>
